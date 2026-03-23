@@ -1,18 +1,10 @@
-mod camera;
-mod hittable;
-mod material;
-mod ray;
-mod render;
-mod scene;
-mod sphere;
-mod vec3;
-
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Instant;
 
 use rayon::prelude::*;
 
-use render::{RenderConfig, render_row};
+use path_tracer::render::{RenderConfig, render_row};
+use path_tracer::scene;
 
 fn main() {
     let config = RenderConfig {
