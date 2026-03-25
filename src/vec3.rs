@@ -51,6 +51,15 @@ impl Vec3 {
         self / self.length()
     }
 
+    /// Access a component by axis index (0=X, 1=Y, 2=Z).
+    pub fn axis(self, index: usize) -> f64 {
+        match index {
+            0 => self.x,
+            1 => self.y,
+            _ => self.z,
+        }
+    }
+
     /// Returns true if the vector is close to zero in all dimensions.
     pub fn near_zero(self) -> bool {
         const EPS: f64 = 1e-8;

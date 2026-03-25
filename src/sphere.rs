@@ -1,7 +1,8 @@
+use crate::aabb::Aabb;
 use crate::hittable::{HitRecord, Hittable, Interval};
 use crate::material::Material;
 use crate::ray::Ray;
-use crate::vec3::Point3;
+use crate::vec3::{Point3, Vec3};
 
 /// A sphere defined by its center and radius.
 pub struct Sphere {
@@ -17,6 +18,11 @@ impl Sphere {
             radius,
             material,
         }
+    }
+
+    pub fn bounding_box(&self) -> Aabb {
+        let offset = Vec3::new(self.radius, self.radius, self.radius);
+        Aabb::new(self.center - offset, self.center + offset)
     }
 }
 

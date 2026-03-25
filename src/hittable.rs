@@ -1,3 +1,4 @@
+use crate::aabb::Aabb;
 use crate::material::Material;
 use crate::ray::Ray;
 use crate::sphere::Sphere;
@@ -73,6 +74,12 @@ pub enum Shape {
 impl Shape {
     pub fn sphere(center: Point3, radius: f64, material: Material) -> Self {
         Self::Sphere(Sphere::new(center, radius, material))
+    }
+
+    pub fn bounding_box(&self) -> Aabb {
+        match self {
+            Self::Sphere(s) => s.bounding_box(),
+        }
     }
 }
 
