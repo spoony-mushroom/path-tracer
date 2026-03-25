@@ -1,5 +1,6 @@
 use crate::material::Material;
 use crate::ray::Ray;
+use crate::sphere::Sphere;
 use crate::vec3::{Point3, Vec3};
 
 /// Record of a ray-surface intersection.
@@ -64,9 +65,28 @@ pub trait Hittable: Send + Sync {
     fn hit(&self, ray: &Ray, t_range: Interval) -> Option<HitRecord>;
 }
 
-/// A collection of hittable objects.
+/// Concrete shape type using enum dispatch for cache-friendly intersection testing.
+pub enum Shape {
+    Sphere(Sphere),
+}
+
+impl Shape {
+    pub fn sphere(center: Point3, radius: f64, material: Material) -> Self {
+        Self::Sphere(Sphere::new(center, radius, material))
+    }
+}
+
+impl Hittable for Shape {
+    fn hit(&self, ray: &Ray, t_range: Interval) -> Option<HitRecord> {
+        match self {
+            Self::Sphere(s) => s.hit(ray, t_range),
+        }
+    }
+}
+
+/// A collection of shapes stored contiguously for cache-friendly iteration.
 pub struct HittableList {
-    objects: Vec<Box<dyn Hittable>>,
+    objects: Vec<Shape>,
 }
 
 impl HittableList {
@@ -76,8 +96,8 @@ impl HittableList {
         }
     }
 
-    pub fn add(&mut self, object: impl Hittable + 'static) {
-        self.objects.push(Box::new(object));
+    pub fn add(&mut self, object: Shape) {
+        self.objects.push(object);
     }
 }
 

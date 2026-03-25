@@ -14,7 +14,7 @@ pub struct RenderConfig {
 }
 
 /// Trace a single ray through the scene, recursively bouncing off surfaces.
-pub fn ray_color(ray: &Ray, world: &dyn Hittable, depth: u32, rng: &mut impl Rng) -> Color {
+pub fn ray_color(ray: &Ray, world: &impl Hittable, depth: u32, rng: &mut impl Rng) -> Color {
     if depth == 0 {
         return Color::ZERO;
     }
@@ -40,7 +40,7 @@ pub fn render_row(
     y: u32,
     config: &RenderConfig,
     camera: &Camera,
-    world: &dyn Hittable,
+    world: &(impl Hittable + Sync),
 ) -> Vec<[u8; 3]> {
     let mut rng = rand::rng();
     let mut row = Vec::with_capacity(config.image_width as usize);

@@ -1,9 +1,8 @@
 use rand::Rng;
 
 use crate::camera::{Camera, CameraConfig};
-use crate::hittable::HittableList;
+use crate::hittable::{HittableList, Shape};
 use crate::material::Material;
-use crate::sphere::Sphere;
 use crate::vec3::{Color, Point3, Vec3};
 
 /// Build the classic "random spheres" demo scene.
@@ -13,7 +12,7 @@ pub fn random_spheres_scene() -> (HittableList, Camera) {
 
     // Ground
     let ground = Material::lambertian(Color::new(0.5, 0.5, 0.5));
-    world.add(Sphere::new(Point3::new(0.0, -1000.0, 0.0), 1000.0, ground));
+    world.add(Shape::sphere(Point3::new(0.0, -1000.0, 0.0), 1000.0, ground));
 
     // Small random spheres
     for a in -11..11 {
@@ -40,22 +39,22 @@ pub fn random_spheres_scene() -> (HittableList, Camera) {
                 Material::dielectric(1.5)
             };
 
-            world.add(Sphere::new(center, 0.2, material));
+            world.add(Shape::sphere(center, 0.2, material));
         }
     }
 
     // Three large showcase spheres
-    world.add(Sphere::new(
+    world.add(Shape::sphere(
         Point3::new(0.0, 1.0, 0.0),
         1.0,
         Material::dielectric(1.5),
     ));
-    world.add(Sphere::new(
+    world.add(Shape::sphere(
         Point3::new(-4.0, 1.0, 0.0),
         1.0,
         Material::lambertian(Color::new(0.4, 0.2, 0.1)),
     ));
-    world.add(Sphere::new(
+    world.add(Shape::sphere(
         Point3::new(4.0, 1.0, 0.0),
         1.0,
         Material::metal(Color::new(0.7, 0.6, 0.5), 0.0),
