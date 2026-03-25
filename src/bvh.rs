@@ -82,3 +82,61 @@ impl Hittable for BvhNode {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::material::Material;
+    use crate::vec3::{Color, Point3, Vec3};
+
+    fn test_sphere(x: f64, z: f64) -> Shape {
+        Shape::sphere(
+            Point3::new(x, 0.0, z),
+            0.5,
+            Material::lambertian(Color::new(0.5, 0.5, 0.5)),
+        )
+    }
+
+    #[test]
+    fn test_build_single() {
+        let bvh = BvhNode::build(vec![test_sphere(0.0, 0.0)]);
+        assert!(matches!(bvh, BvhNode::Leaf { .. }));
+    }
+
+    #[test]
+    fn test_build_multiple() {
+        let shapes = vec![
+            test_sphere(-2.0, 0.0),
+            test_sphere(0.0, 0.0),
+            test_sphere(2.0, 0.0),
+        ];
+        let bvh = BvhNode::build(shapes);
+        assert!(matches!(bvh, BvhNode::Interior { .. }));
+    }
+
+    #[test]
+    fn test_hit_finds_closest() {
+        let shapes = vec![
+            test_sphere(0.0, -3.0), // farther
+            test_sphere(0.0, -1.0), // closer
+        ];
+        let bvh = BvhNode::build(shapes);
+
+        let ray = Ray::new(Point3::new(0.0, 0.0, 1.0), Vec3::new(0.0, 0.0, -1.0));
+        let hit = bvh.hit(&ray, Interval::new(0.001, f64::INFINITY));
+        assert!(hit.is_some());
+        let hit = hit.unwrap();
+        // Should hit the closer sphere at z=-1.0 (t ≈ 1.5)
+        assert!((hit.point.z - -0.5).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_miss() {
+        let shapes = vec![test_sphere(0.0, 0.0)];
+        let bvh = BvhNode::build(shapes);
+
+        let ray = Ray::new(Point3::new(10.0, 10.0, 0.0), Vec3::new(0.0, 1.0, 0.0));
+        let hit = bvh.hit(&ray, Interval::new(0.001, f64::INFINITY));
+        assert!(hit.is_none());
+    }
+}

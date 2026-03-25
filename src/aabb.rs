@@ -65,3 +65,61 @@ impl Aabb {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::vec3::Vec3;
+
+    fn unit_box() -> Aabb {
+        Aabb::new(Point3::new(-1.0, -1.0, -1.0), Point3::new(1.0, 1.0, 1.0))
+    }
+
+    #[test]
+    fn test_hit() {
+        let bbox = unit_box();
+        let ray = Ray::new(Point3::new(0.0, 0.0, -5.0), Vec3::new(0.0, 0.0, 1.0));
+        assert!(bbox.hit(&ray, Interval::new(0.001, f64::INFINITY)));
+    }
+
+    #[test]
+    fn test_miss() {
+        let bbox = unit_box();
+        let ray = Ray::new(Point3::new(0.0, 5.0, -5.0), Vec3::new(0.0, 0.0, 1.0));
+        assert!(!bbox.hit(&ray, Interval::new(0.001, f64::INFINITY)));
+    }
+
+    #[test]
+    fn test_hit_negative_direction() {
+        let bbox = unit_box();
+        let ray = Ray::new(Point3::new(0.0, 0.0, 5.0), Vec3::new(0.0, 0.0, -1.0));
+        assert!(bbox.hit(&ray, Interval::new(0.001, f64::INFINITY)));
+    }
+
+    #[test]
+    fn test_surrounding() {
+        let a = Aabb::new(Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 1.0, 1.0));
+        let b = Aabb::new(Point3::new(-1.0, -1.0, -1.0), Point3::new(0.5, 0.5, 0.5));
+        let merged = Aabb::surrounding(a, b);
+        assert_eq!(merged.min, Point3::new(-1.0, -1.0, -1.0));
+        assert_eq!(merged.max, Point3::new(1.0, 1.0, 1.0));
+    }
+
+    #[test]
+    fn test_centroid() {
+        let bbox = Aabb::new(Point3::new(0.0, 2.0, 4.0), Point3::new(2.0, 4.0, 6.0));
+        assert_eq!(bbox.centroid(), Point3::new(1.0, 3.0, 5.0));
+    }
+
+    #[test]
+    fn test_longest_axis() {
+        let x_long = Aabb::new(Point3::new(0.0, 0.0, 0.0), Point3::new(10.0, 1.0, 1.0));
+        assert_eq!(x_long.longest_axis(), 0);
+
+        let y_long = Aabb::new(Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 10.0, 1.0));
+        assert_eq!(y_long.longest_axis(), 1);
+
+        let z_long = Aabb::new(Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 1.0, 10.0));
+        assert_eq!(z_long.longest_axis(), 2);
+    }
+}
