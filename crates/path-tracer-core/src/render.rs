@@ -17,7 +17,7 @@ pub struct RenderConfig {
     pub max_depth: u32,
 }
 
-/// Render the full image, returning an `RgbImage`.
+/// Render the full image at once, returning an `RgbImage`.
 ///
 /// Rows are rendered in parallel. The `on_progress` callback is invoked
 /// with `(completed_rows, total_rows)` as rendering proceeds.
@@ -28,25 +28,120 @@ pub fn render_image(
     on_progress: impl Fn(u32, u32) + Sync,
 ) -> RgbImage {
     let completed = AtomicU32::new(0);
+    let width = config.image_width;
+    let height = config.image_height;
+    let spp = config.samples_per_pixel;
+    let max_depth = config.max_depth;
 
-    let rows: Vec<Vec<[u8; 3]>> = (0..config.image_height)
+    let rows: Vec<Vec<[u8; 3]>> = (0..height)
         .into_par_iter()
         .rev()
         .map(|y| {
-            let row = render_row(y, config, camera, world);
+            let mut rng = rand::rng();
+            let mut row = Vec::with_capacity(width as usize);
+            for x in 0..width {
+                let mut pixel_color = Color::ZERO;
+                for _ in 0..spp {
+                    pixel_color += sample_pixel(x, y, width, height, max_depth, camera, world, &mut rng);
+                }
+                row.push(color_to_rgb(pixel_color, spp));
+            }
             let done = completed.fetch_add(1, Ordering::Relaxed) + 1;
-            on_progress(done, config.image_height);
+            on_progress(done, height);
             row
         })
         .collect();
 
-    let mut img = RgbImage::new(config.image_width, config.image_height);
+    let mut img = RgbImage::new(width, height);
     for (row_idx, row) in rows.iter().enumerate() {
         for (x, &pixel) in row.iter().enumerate() {
             img.put_pixel(x as u32, row_idx as u32, image::Rgb(pixel));
         }
     }
     img
+}
+
+/// Progressive renderer that accumulates samples incrementally.
+///
+/// The client drives the rendering loop by calling `refine()` repeatedly,
+/// and can stop at any time when the quality is sufficient.
+pub struct ProgressiveRenderer {
+    width: u32,
+    height: u32,
+    max_depth: u32,
+    accumulator: Vec<Color>,
+    sample_count: u32,
+}
+
+impl ProgressiveRenderer {
+    pub fn new(config: &RenderConfig) -> Self {
+        let pixel_count = (config.image_width * config.image_height) as usize;
+        Self {
+            width: config.image_width,
+            height: config.image_height,
+            max_depth: config.max_depth,
+            accumulator: vec![Color::ZERO; pixel_count],
+            sample_count: 0,
+        }
+    }
+
+    /// Add one sample per pixel (parallelized across rows).
+    /// Returns the total number of samples accumulated so far.
+    pub fn refine(&mut self, camera: &Camera, world: &(impl Hittable + Sync)) -> u32 {
+        let width = self.width;
+        let height = self.height;
+        let max_depth = self.max_depth;
+
+        let new_samples: Vec<Color> = (0..height)
+            .into_par_iter()
+            .rev()
+            .flat_map(|y| {
+                let mut rng = rand::rng();
+                (0..width)
+                    .map(|x| sample_pixel(x, y, width, height, max_depth, camera, world, &mut rng))
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+
+        for (acc, sample) in self.accumulator.iter_mut().zip(new_samples.iter()) {
+            *acc += *sample;
+        }
+        self.sample_count += 1;
+        self.sample_count
+    }
+
+    /// Current number of accumulated samples per pixel.
+    pub fn sample_count(&self) -> u32 {
+        self.sample_count
+    }
+
+    /// Convert the current accumulator state to an `RgbImage`.
+    pub fn image(&self) -> RgbImage {
+        let mut img = RgbImage::new(self.width, self.height);
+        for (i, color) in self.accumulator.iter().enumerate() {
+            let x = (i as u32) % self.width;
+            let y = (i as u32) / self.width;
+            img.put_pixel(x, y, image::Rgb(color_to_rgb(*color, self.sample_count)));
+        }
+        img
+    }
+}
+
+/// Trace a single sample for one pixel.
+fn sample_pixel(
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+    max_depth: u32,
+    camera: &Camera,
+    world: &impl Hittable,
+    rng: &mut impl Rng,
+) -> Color {
+    let u = (x as f64 + rng.random::<f64>()) / (width - 1) as f64;
+    let v = (y as f64 + rng.random::<f64>()) / (height - 1) as f64;
+    let ray = camera.get_ray(u, v, rng);
+    ray_color(&ray, world, max_depth, rng)
 }
 
 /// Trace a single ray through the scene, recursively bouncing off surfaces.
@@ -69,32 +164,6 @@ fn ray_color(ray: &Ray, world: &impl Hittable, depth: u32, rng: &mut impl Rng) -
     let unit_dir = ray.direction.normalized();
     let a = 0.5 * (unit_dir.y + 1.0);
     Color::new(1.0, 1.0, 1.0) * (1.0 - a) + Color::new(0.5, 0.7, 1.0) * a
-}
-
-/// Render a single row of pixels, returning a Vec of (r, g, b) bytes.
-fn render_row(
-    y: u32,
-    config: &RenderConfig,
-    camera: &Camera,
-    world: &(impl Hittable + Sync),
-) -> Vec<[u8; 3]> {
-    let mut rng = rand::rng();
-    let mut row = Vec::with_capacity(config.image_width as usize);
-
-    for x in 0..config.image_width {
-        let mut pixel_color = Color::ZERO;
-
-        for _ in 0..config.samples_per_pixel {
-            let u = (x as f64 + rng.random::<f64>()) / (config.image_width - 1) as f64;
-            let v = (y as f64 + rng.random::<f64>()) / (config.image_height - 1) as f64;
-            let ray = camera.get_ray(u, v, &mut rng);
-            pixel_color += ray_color(&ray, world, config.max_depth, &mut rng);
-        }
-
-        row.push(color_to_rgb(pixel_color, config.samples_per_pixel));
-    }
-
-    row
 }
 
 /// Convert accumulated color to gamma-corrected 8-bit RGB.

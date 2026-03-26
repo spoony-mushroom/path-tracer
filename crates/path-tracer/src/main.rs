@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use path_tracer_core::render::{RenderConfig, render_image};
+use path_tracer_core::render::{ProgressiveRenderer, RenderConfig};
 use path_tracer_core::scene;
 
 fn main() {
@@ -14,21 +14,26 @@ fn main() {
     let (world, camera) = scene::random_spheres_scene();
 
     eprintln!(
-        "Rendering {}x{} @ {} spp...",
+        "Rendering {}x{} @ {} spp (progressive)...",
         config.image_width, config.image_height, config.samples_per_pixel
     );
     let start = Instant::now();
 
-    let img = render_image(&config, &camera, &world, |done, total| {
-        if done % 50 == 0 || done == total {
-            eprintln!("  rows: {done}/{total}");
+    let mut renderer = ProgressiveRenderer::new(&config);
+
+    loop {
+        let samples = renderer.refine(&camera, &world);
+
+        if samples % 10 == 0 || samples >= config.samples_per_pixel {
+            let img = renderer.image();
+            let path = format!("output_{samples:03}.png");
+            img.save(&path).expect("Failed to write output image");
+            let elapsed = start.elapsed();
+            eprintln!("  pass {samples}/{} -> {path} ({elapsed:.2?})", config.samples_per_pixel);
         }
-    });
 
-    let elapsed = start.elapsed();
-    eprintln!("Render complete in {elapsed:.2?}");
-
-    let output_path = "output.png";
-    img.save(output_path).expect("Failed to write output image");
-    eprintln!("Saved to {output_path}");
+        if samples >= config.samples_per_pixel {
+            break;
+        }
+    }
 }
