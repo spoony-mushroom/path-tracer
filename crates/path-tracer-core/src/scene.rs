@@ -1,13 +1,13 @@
 use rand::Rng;
 
-use crate::bvh::BvhNode;
+use crate::bvh::Bvh;
 use crate::camera::{Camera, CameraConfig};
 use crate::hittable::Shape;
 use crate::material::Material;
 use crate::vec3::{Color, Point3, Vec3};
 
 /// Build the classic "random spheres" demo scene.
-pub fn random_spheres_scene() -> (BvhNode, Camera) {
+pub fn random_spheres_scene() -> (Bvh, Camera) {
     let mut shapes = Vec::new();
     let mut rng = rand::rng();
 
@@ -61,7 +61,7 @@ pub fn random_spheres_scene() -> (BvhNode, Camera) {
         Material::metal(Color::new(0.7, 0.6, 0.5), 0.0),
     ));
 
-    let bvh = BvhNode::build(shapes);
+    let bvh = Bvh::build(shapes);
 
     let lookfrom = Point3::new(13.0, 2.0, 3.0);
     let lookat = Point3::new(0.0, 0.0, 0.0);
