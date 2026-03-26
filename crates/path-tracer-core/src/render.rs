@@ -1,4 +1,8 @@
+use std::sync::atomic::{AtomicU32, Ordering};
+
+use image::RgbImage;
 use rand::Rng;
+use rayon::prelude::*;
 
 use crate::camera::Camera;
 use crate::hittable::{Hittable, Interval};
@@ -13,8 +17,40 @@ pub struct RenderConfig {
     pub max_depth: u32,
 }
 
+/// Render the full image, returning an `RgbImage`.
+///
+/// Rows are rendered in parallel. The `on_progress` callback is invoked
+/// with `(completed_rows, total_rows)` as rendering proceeds.
+pub fn render_image(
+    config: &RenderConfig,
+    camera: &Camera,
+    world: &(impl Hittable + Sync),
+    on_progress: impl Fn(u32, u32) + Sync,
+) -> RgbImage {
+    let completed = AtomicU32::new(0);
+
+    let rows: Vec<Vec<[u8; 3]>> = (0..config.image_height)
+        .into_par_iter()
+        .rev()
+        .map(|y| {
+            let row = render_row(y, config, camera, world);
+            let done = completed.fetch_add(1, Ordering::Relaxed) + 1;
+            on_progress(done, config.image_height);
+            row
+        })
+        .collect();
+
+    let mut img = RgbImage::new(config.image_width, config.image_height);
+    for (row_idx, row) in rows.iter().enumerate() {
+        for (x, &pixel) in row.iter().enumerate() {
+            img.put_pixel(x as u32, row_idx as u32, image::Rgb(pixel));
+        }
+    }
+    img
+}
+
 /// Trace a single ray through the scene, recursively bouncing off surfaces.
-pub fn ray_color(ray: &Ray, world: &impl Hittable, depth: u32, rng: &mut impl Rng) -> Color {
+fn ray_color(ray: &Ray, world: &impl Hittable, depth: u32, rng: &mut impl Rng) -> Color {
     if depth == 0 {
         return Color::ZERO;
     }
@@ -36,7 +72,7 @@ pub fn ray_color(ray: &Ray, world: &impl Hittable, depth: u32, rng: &mut impl Rn
 }
 
 /// Render a single row of pixels, returning a Vec of (r, g, b) bytes.
-pub fn render_row(
+fn render_row(
     y: u32,
     config: &RenderConfig,
     camera: &Camera,

@@ -1,12 +1,6 @@
-[package]
-name = "path-tracer"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-image = "0.25"
-rand = "0.9"
-rayon = "1.10"
+[workspace]
+members = ["crates/*"]
+resolver = "3"
 
 [profile.release]
 lto = true
