@@ -1,3 +1,4 @@
+use std::env;
 use std::time::Instant;
 
 use minifb::{Key, Window, WindowOptions};
@@ -13,7 +14,15 @@ fn main() {
         max_depth: 50,
     };
 
-    let (world, camera) = scene::random_spheres_scene();
+    let arg = env::args().nth(1).unwrap_or_default();
+    let (world, camera) = if arg.ends_with(".obj") {
+        scene::obj_scene(&arg)
+    } else {
+        match arg.as_str() {
+            "mesh" => scene::mesh_demo_scene(),
+            _ => scene::random_spheres_scene(),
+        }
+    };
 
     let width = config.image_width as usize;
     let height = config.image_height as usize;

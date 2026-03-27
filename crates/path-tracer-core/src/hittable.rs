@@ -2,6 +2,7 @@ use crate::aabb::Aabb;
 use crate::material::Material;
 use crate::ray::Ray;
 use crate::sphere::Sphere;
+use crate::triangle::Triangle;
 use crate::vec3::{Point3, Vec3};
 
 /// Record of a ray-surface intersection.
@@ -69,6 +70,7 @@ pub trait Hittable: Send + Sync {
 /// Concrete shape type using enum dispatch for cache-friendly intersection testing.
 pub enum Shape {
     Sphere(Sphere),
+    Triangle(Triangle),
 }
 
 impl Shape {
@@ -76,9 +78,14 @@ impl Shape {
         Self::Sphere(Sphere::new(center, radius, material))
     }
 
+    pub fn triangle(v0: Point3, v1: Point3, v2: Point3, material: Material) -> Self {
+        Self::Triangle(Triangle::new(v0, v1, v2, material))
+    }
+
     pub fn bounding_box(&self) -> Aabb {
         match self {
             Self::Sphere(s) => s.bounding_box(),
+            Self::Triangle(t) => t.bounding_box(),
         }
     }
 }
@@ -87,6 +94,7 @@ impl Hittable for Shape {
     fn hit(&self, ray: &Ray, t_range: Interval) -> Option<HitRecord> {
         match self {
             Self::Sphere(s) => s.hit(ray, t_range),
+            Self::Triangle(t) => t.hit(ray, t_range),
         }
     }
 }
