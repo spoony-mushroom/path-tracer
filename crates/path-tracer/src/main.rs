@@ -1,5 +1,7 @@
 use std::time::Instant;
 
+use minifb::{Key, Window, WindowOptions};
+
 use path_tracer_core::render::{ProgressiveRenderer, RenderConfig};
 use path_tracer_core::scene;
 
@@ -13,27 +15,42 @@ fn main() {
 
     let (world, camera) = scene::random_spheres_scene();
 
-    eprintln!(
-        "Rendering {}x{} @ {} spp (progressive)...",
-        config.image_width, config.image_height, config.samples_per_pixel
-    );
-    let start = Instant::now();
+    let width = config.image_width as usize;
+    let height = config.image_height as usize;
 
+    let mut window = Window::new(
+        "Path Tracer",
+        width,
+        height,
+        WindowOptions::default(),
+    )
+    .expect("Failed to create window");
+
+    let start = Instant::now();
     let mut renderer = ProgressiveRenderer::new(&config);
 
-    loop {
-        let samples = renderer.refine(&camera, &world);
-
-        if samples % 10 == 0 || samples >= config.samples_per_pixel {
-            let img = renderer.image();
-            let path = format!("output_{samples:03}.png");
-            img.save(&path).expect("Failed to write output image");
+    while window.is_open() && !window.is_key_down(Key::Escape) {
+        if renderer.sample_count() < config.samples_per_pixel {
+            renderer.refine(&camera, &world);
             let elapsed = start.elapsed();
-            eprintln!("  pass {samples}/{} -> {path} ({elapsed:.2?})", config.samples_per_pixel);
+            eprintln!(
+                "  pass {}/{} ({elapsed:.2?})",
+                renderer.sample_count(),
+                config.samples_per_pixel
+            );
         }
 
-        if samples >= config.samples_per_pixel {
-            break;
-        }
+        let buffer = renderer.buffer_u32();
+        window
+            .update_with_buffer(&buffer, width, height)
+            .expect("Failed to update window");
     }
+
+    // Save final image on exit.
+    let output_path = "output.png";
+    renderer
+        .image()
+        .save(output_path)
+        .expect("Failed to write output image");
+    eprintln!("Saved to {output_path}");
 }

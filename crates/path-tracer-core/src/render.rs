@@ -115,6 +115,18 @@ impl ProgressiveRenderer {
         self.sample_count
     }
 
+    /// Convert the current accumulator to a packed `0x00RRGGBB` buffer
+    /// suitable for framebuffer display (e.g., `minifb`).
+    pub fn buffer_u32(&self) -> Vec<u32> {
+        self.accumulator
+            .iter()
+            .map(|color| {
+                let [r, g, b] = color_to_rgb(*color, self.sample_count);
+                (r as u32) << 16 | (g as u32) << 8 | (b as u32)
+            })
+            .collect()
+    }
+
     /// Convert the current accumulator state to an `RgbImage`.
     pub fn image(&self) -> RgbImage {
         let mut img = RgbImage::new(self.width, self.height);
